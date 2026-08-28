@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PatientTriage.ai — Intake Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0F1C; --panel: #111A2E; --panel-alt: #16213A; --border: #223154;
+    --text: #E8EDF5; --text-dim: #8BA0C4; --text-mute: #5B6D8F;
+    --esi1: #E5484D; --esi2: #F5A524; --esi3: #E8C547; --esi4: #3DD68C; --esi5: #4C9EF5;
+    --accent: #6E8EFB; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; }
+  .brand-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -0.02em; margin: 0; }
+  .brand-title span { color: var(--accent); }
+  .brand-sub { color: var(--text-mute); font-size: 13px; margin-top: 4px; }
+  .live-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--esi4); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .spectrum { display: flex; border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; border: 1px solid var(--border); }
+  .spectrum-seg { flex: 1; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: #0A0F1C; }
+
+  .layout { display: grid; grid-template-columns: 1.7fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 18px; }
+  .panel-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .panel-sub { font-size: 12px; color: var(--text-mute); margin-bottom: 16px; }
+
+  /* ---------- Intake form ---------- */
+  .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 14px; }
+  .form-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+  .form-grid label.wide { grid-column: 1 / -1; }
+  .form-grid label.checkbox-label { flex-direction: row; align-items: center; gap: 8px; text-transform: none; font-size: 13px; color: var(--text); }
+  .form-grid input, .form-grid select, .form-grid textarea {
+    background: var(--panel-alt); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 13.5px;
+  }
+  .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus { border-color: var(--accent); outline: none; }
+  .form-grid textarea { resize: vertical; }
+  .chronic-check { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .chronic-check label { flex-direction: row; align-items: center; gap: 6px; text-transform: none; font-size: 12.5px; color: var(--text); }
+  @media (max-width: 960px) { .form-grid { grid-template-columns: repeat(2,1fr); } }
+
+  button { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13.5px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--text); padding: 10px 18px; cursor: pointer; transition: all 0.15s ease; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0A0F1C; font-size: 14px; }
+  button.primary:hover { background: #8AA6FF; color: #0A0F1C; }
+  button.accept { background: var(--esi4); border-color: var(--esi4); color: #0A0F1C; }
+  button.accept:hover { background: #57e0a3; color: #0A0F1C; }
+  button.override-btn { border-color: var(--esi2); color: var(--esi2); }
+  button.override-btn:hover { background: rgba(245,165,36,0.12); }
+  button.ghost-small { padding: 6px 12px; font-size: 12px; }
+  .form-actions { margin-top: 16px; }
+
+  /* ---------- AI Recommendation card ---------- */
+  #recoPanel { display: none; }
+  #recoPanel.show { display: block; border-color: var(--accent); animation: slidein 0.35s ease; }
+  @keyframes slidein { from { opacity:0; transform: translateY(-8px);} to { opacity:1; transform: translateY(0);} }
+  .reco-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .reco-badge { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px; width: 62px; height: 62px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #0A0F1C; flex-shrink: 0; }
+  .reco-headline { font-size: 16px; font-weight: 600; }
+  .reco-sub { font-size: 12.5px; color: var(--text-mute); margin-top: 3px; }
+  .trace-line { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); padding: 4px 0 4px 12px; border-left: 2px solid var(--border); margin-bottom: 2px; }
+  .trace-line.hit { border-left-color: var(--esi2); color: var(--text); }
+  .conf-reasons { margin: 10px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-mute); }
+  .conf-reasons li { margin-bottom: 3px; }
+  .reco-actions { margin-top: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .override-panel { display: none; margin-top: 12px; padding: 12px 14px; background: var(--panel-alt); border: 1px solid var(--esi2); border-radius: 8px; }
+  .override-panel.show { display: block; }
+  .override-panel .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .override-panel select, .override-panel input[type=text] { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 9px; font-size: 13px; }
+  .override-panel input[type=text] { flex: 1; min-width: 200px; }
+  .admitted-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--esi4); font-weight: 600; margin-top: 12px; }
+
+  /* ---------- Queue list ---------- */
+  #patientList { display: flex; flex-direction: column; gap: 8px; max-height: 480px; overflow-y: auto; padding-right: 4px; }
+  .p-card { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; border-left-width: 4px; }
+  .p-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; }
+  .esi-badge-sm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: #0A0F1C; flex-shrink: 0; }
+  .p-id { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-dim); width: 50px; flex-shrink: 0; }
+  .p-meta { flex: 1; min-width: 0; }
+  .p-complaint { font-size: 12.5px; font-weight: 500; }
+  .p-sub { font-size: 10.5px; color: var(--text-mute); margin-top: 2px; }
+  .conf-pill { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 3px 7px; border-radius: 20px; background: var(--panel); color: var(--text-dim); flex-shrink: 0; }
+  .bed-pill { font-size: 9.5px; text-transform: uppercase; padding: 3px 7px; border-radius: 20px; flex-shrink: 0; font-weight: 600; }
+  .bed-pill.dynamic { background: rgba(61,214,140,0.15); color: var(--esi4); }
+  .bed-pill.reserved { background: rgba(229,72,77,0.15); color: var(--esi1); }
+  .bed-pill.wait { background: rgba(245,165,36,0.15); color: var(--esi2); }
+  .chevron { color: var(--text-mute); font-size: 11px; transition: transform 0.15s ease; flex-shrink: 0; }
+  .p-card.open .chevron { transform: rotate(90deg); }
+  .p-detail { display: none; padding: 0 12px 12px 62px; }
+  .p-card.open .p-detail { display: block; }
+  .override-tag-sm { font-size: 10px; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-top: 6px; }
+  .queue-empty { color: var(--text-mute); font-size: 12.5px; padding: 20px 0; text-align: center; }
+
+  /* ---------- Sidebar: hospital status ---------- */
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .bed-bar-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-dim); margin-bottom: 5px; margin-top: 10px; }
+  .bed-bar { height: 18px; border-radius: 6px; background: var(--panel-alt); overflow: hidden; border: 1px solid var(--border); }
+  .bed-bar-fill { height: 100%; }
+  .queue-alert { display: flex; justify-content: space-between; align-items: center; padding: 7px 9px; border-radius: 7px; background: var(--panel-alt); margin-bottom: 6px; font-size: 11.5px; }
+  .queue-alert .badge { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; padding: 2px 6px; border-radius: 10px; background: rgba(229,72,77,0.15); color: var(--esi1); font-weight: 600; }
+  .audit-entry { padding: 8px 9px; border-radius: 7px; background: var(--panel-alt); margin-bottom: 6px; font-size: 11.5px; }
+  .audit-entry .top-row { display: flex; justify-content: space-between; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 10px; margin-bottom: 3px; }
+  .audit-entry .reason { color: var(--text-mute); font-size: 11px; }
+  .dir-up { color: var(--esi1); font-weight: 700; }
+  .dir-down { color: var(--esi4); font-weight: 700; }
+  .empty-note { color: var(--text-mute); font-size: 12px; padding: 8px 0; }
+
+  .demo-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .demo-tools button { font-size: 11.5px; padding: 7px 10px; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1 class="brand-title">PatientTriage<span>.ai</span></h1>
+      <div class="brand-sub">Intake Console · Sigma Gals · Accenture Innovation Challenge 2026</div>
+    </div>
+    <div class="live-clock"><span class="live-dot"></span><span id="clock"></span></div>
+  </header>
+
+  <div class="spectrum">
+    <div class="spectrum-seg" style="background:var(--esi1)">1 · IMMEDIATE</div>
+    <div class="spectrum-seg" style="background:var(--esi2)">2 · EMERGENT</div>
+    <div class="spectrum-seg" style="background:var(--esi3)">3 · URGENT</div>
+    <div class="spectrum-seg" style="background:var(--esi4)">4 · LESS URGENT</div>
+    <div class="spectrum-seg" style="background:var(--esi5)">5 · NON-URGENT</div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <!-- INTAKE FORM -->
+      <div class="panel">
+        <div class="panel-title">New Patient Intake</div>
+        <div class="panel-sub">Nurse or patient fills in what's known at arrival — the AI returns an ESI recommendation instantly.</div>
+        <div class="form-grid">
+          <label>Age <input type="number" id="m_age" value="40" min="0" max="120"></label>
+          <label>Gender
+            <select id="m_gender"><option value="M">M</option><option value="F">F</option></select>
+          </label>
+          <label>Weight (kg) <input type="number" id="m_weight" value="70" min="1" max="200" step="0.1"></label>
+          <label>Arrival mode
+            <select id="m_arrival"><option value="walk-in">Walk-in</option><option value="ambulance">Ambulance</option><option value="referred">Referred</option></select>
+          </label>
+
+          <label>Heart rate (bpm) <input type="number" id="m_hr" value="85"></label>
+          <label>Respiratory rate <input type="number" id="m_rr" value="16"></label>
+          <label>SpO2 (%) <input type="number" id="m_spo2" value="98" max="100"></label>
+          <label>Temperature (°C) <input type="number" id="m_temp" value="37.0" step="0.1"></label>
+
+          <label>Pain score (0-10) <input type="number" id="m_pain" value="3" min="0" max="10"></label>
+          <label>Consciousness
+            <select id="m_consciousness">
+              <option value="alert">Alert</option><option value="verbal">Verbal</option>
+              <option value="pain">Pain</option><option value="unresponsive">Unresponsive</option>
+            </select>
+          </label>
+          <label>Chief complaint <select id="m_complaint"></select></label>
+          <label>Symptom onset (hours ago) <input type="number" id="m_onset" value="4" step="0.1"></label>
+
+          <label class="checkbox-label"><input type="checkbox" id="m_prior"> Has prior hospital record</label>
+          <label>Pregnancy status
+            <select id="m_pregnancy">
+              <option value="not_applicable">Not applicable</option>
+              <option value="not_pregnant">Not pregnant</option>
+              <option value="pregnant">Pregnant</option>
+            </select>
+          </label>
+
+          <label class="wide">Symptom description (free text — what the patient says, in their own words)
+            <textarea id="m_symptom" rows="2" placeholder="e.g. Patient reports chest pain radiating to left arm since 20 minutes ago"></textarea>
+          </label>
+          <div class="wide">
+            <div class="panel-sub" style="margin-bottom:6px;">Chronic illness conditions</div>
+            <div class="chronic-check" id="m_chronic_checks"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="primary" id="btnRunTriage">Get AI Triage Recommendation →</button>
+        </div>
+      </div>
+
+      <!-- AI RECOMMENDATION -->
+      <div class="panel" id="recoPanel">
+        <div class="panel-title">AI Recommendation</div>
+        <div class="reco-head">
+          <div class="reco-badge" id="recoBadge"></div>
+          <div>
+            <div class="reco-headline" id="recoHeadline"></div>
+            <div class="reco-sub" id="recoSub"></div>
+          </div>
+        </div>
+        <div id="recoTrace"></div>
+        <ul class="conf-reasons" id="recoConfReasons"></ul>
+
+        <div class="reco-actions">
+          <button class="accept" id="btnAccept">✓ Accept & Admit Patient</button>
+          <button class="override-btn" id="btnShowOverride">Override Recommendation</button>
+        </div>
+
+        <div class="override-panel" id="overridePanel">
+          <div style="font-size:12.5px;color:var(--text-dim);">Clinician override — final decision always rests with you.</div>
+          <div class="row">
+            <select id="overrideEsi"></select>
+            <input type="text" id="overrideReason" placeholder="Reason for override (required)">
+            <input type="text" id="overrideBy" placeholder="Your name / ID" value="Nurse_ID_204" style="max-width:140px;">
+            <button class="primary ghost-small" id="btnConfirmOverride">Confirm Override & Admit</button>
+          </div>
+        </div>
+
+        <div class="admitted-tag" id="admittedTag" style="display:none;">✓ Patient admitted to queue</div>
+      </div>
+
+      <!-- PATIENT QUEUE -->
+      <div class="panel">
+        <div class="panel-title">Patient Queue <span class="mono" id="queueCount" style="font-weight:400;color:var(--text-mute);font-size:12px;"></span></div>
+        <div class="panel-sub">All patients admitted so far this session, sorted by acuity.</div>
+        <div id="patientList"><div class="queue-empty">No patients admitted yet — use the intake form above.</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-title">Hospital Status</div>
+        <div class="stat-row"><span>Total patients</span><span class="val" id="statTotal">0</span></div>
+        <div class="stat-row"><span>Critical waitlisted</span><span class="val" id="statCritWait">0</span></div>
+        <div class="stat-row"><span>Avg confidence</span><span class="val" id="statConf">—</span></div>
+
+        <div class="bed-bar-label"><span>Dynamic pool (90%)</span><span class="mono" id="dynLabel">0/0</span></div>
+        <div class="bed-bar"><div class="bed-bar-fill" id="dynFill" style="background:var(--esi4)"></div></div>
+        <div class="bed-bar-label"><span>Reserved critical pool (10%)</span><span class="mono" id="resLabel">0/0</span></div>
+        <div class="bed-bar"><div class="bed-bar-fill" id="resFill" style="background:var(--esi1)"></div></div>
+
+        <label style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12px;color:var(--text-dim);">
+          Total beds <input type="number" id="inputBeds" value="22" min="4" max="200" style="width:56px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;">
+        </label>
+        <label style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--text-dim);">
+          Doctors on duty <input type="number" id="inputDoctors" value="6" min="1" max="50" style="width:56px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;">
+        </label>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Waiting Queue Monitor</div>
+        <div id="queuePanel"><div class="empty-note">No patients currently waitlisted.</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Audit Trail</div>
+        <div id="auditPanel"><div class="empty-note">No overrides logged yet.</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Demo Tools</div>
+        <div class="panel-sub">Optional — load a batch of simulated patients to demonstrate surge behaviour and the 90/10 bed rule.</div>
+        <div class="demo-tools">
+          <button id="btnLoadDemo">Load 20 Demo Patients</button>
+          <button id="btnSurge">⚡ Simulate 3× Surge</button>
+          <button id="btnReset">Reset Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CLOCK
+   ========================================================= */
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleString('en-IN', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short'
+  });
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+const RED_FLAG_KEYWORDS = [
+  "radiates to left arm", "jaw", "crushing", "can't breathe", "cannot breathe",
+  "unresponsive", "confusion", "seizure", "severe bleeding", "blue lips",
+  "worst headache", "slurred speech", "one sided weakness", "lethargy"
+];
+const AMBIGUITY_HEDGE_WORDS = ["a bit", "mild but", "feels off", "not sure", "maybe", "kind of"];
+const HIGH_RESOURCE_COMPLAINTS = ["chest pain", "abdominal pain", "breathing difficulty", "injury/trauma"];
+const LOW_RESOURCE_COMPLAINTS = ["minor cut", "prescription refill", "mild headache"];
+const CHIEF_COMPLAINTS = ["chest pain","breathing difficulty","fever","abdominal pain","injury/trauma",
+  "headache","dizziness","allergic reaction","vomiting","back pain","minor cut","prescription refill"];
+const CHRONIC_ILLNESS_POOL = ["diabetes","hypertension","asthma","heart disease","COPD",
+  "chronic kidney disease","cancer_under_treatment","immunosuppressed"];
+const HIGH_RISK_CHRONIC = ["COPD","chronic kidney disease","cancer_under_treatment","immunosuppressed"];
+const PREGNANCY_HIGH_RISK_COMPLAINTS = ["abdominal pain","headache","back pain"];
+const PREGNANCY_RED_FLAGS = ["vaginal bleeding","severe swelling","vision changes","reduced fetal movement","contractions"];
+const RAPID_ONSET_THRESHOLD = 1.0;
+const ARRIVAL_MODES = ["walk-in","ambulance","referred"];
+const SAFE_WAIT_THRESHOLD = {1:0, 2:10, 3:30, 4:60, 5:120};
+const DANGER_ZONES = {
+  pediatric: { hr: 140, rr: 30, spo2: 92 },
+  adult: { hr: 100, rr: 20, spo2: 92 },
+  geriatric: { hr: 100, rr: 20, spo2: 94 },
+};
+const ESI_COLOR = {1:'--esi1',2:'--esi2',3:'--esi3',4:'--esi4',5:'--esi5'};
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+function choice(arr) { return arr[randInt(0, arr.length - 1)]; }
+function weightedChoice(arr, weights) {
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random() * total;
+  for (let i=0;i<arr.length;i++){ if (r < weights[i]) return arr[i]; r -= weights[i]; }
+  return arr[arr.length-1];
+}
+function sample(arr, k) {
+  const copy = [...arr]; const out = [];
+  for (let i=0;i<k && copy.length;i++){ out.push(copy.splice(randInt(0,copy.length-1),1)[0]); }
+  return out;
+}
+function getAgeBand(age) { if (age<12) return "pediatric"; if (age>=65) return "geriatric"; return "adult"; }
+
+/* =========================================================
+   TRIAGE ENGINE
+   ========================================================= */
+function scanSymptomText(text) {
+  const lower = text.toLowerCase();
+  return { matched: RED_FLAG_KEYWORDS.filter(k=>lower.includes(k)),
+    hedges: AMBIGUITY_HEDGE_WORDS.filter(h=>lower.includes(h)).length };
+}
+function step1(p) {
+  if (p.consciousness_level==="unresponsive") return {flag:true, reason:"Unresponsive"};
+  if (p.spo2<85) return {flag:true, reason:`SpO2 ${p.spo2}% - severe hypoxia`};
+  if (p.heart_rate<40 || p.heart_rate>180) return {flag:true, reason:`Heart rate ${p.heart_rate} - extreme abnormal`};
+  return {flag:false};
+}
+function step2(p, kw) {
+  if (["verbal","pain"].includes(p.consciousness_level)) return {flag:true, reason:`Altered mental status ('${p.consciousness_level}')`};
+  if (p.pain_score>=8) return {flag:true, reason:`Severe pain/distress (${p.pain_score}/10)`};
+  if (kw.length) return {flag:true, reason:`Red-flag keyword(s): ${kw.join(", ")}`};
+  if (p.pregnancy_status==="pregnant") {
+    const lower = p.symptom_description.toLowerCase();
+    const flags = PREGNANCY_RED_FLAGS.filter(k=>lower.includes(k));
+    if (flags.length) return {flag:true, reason:`Pregnancy + red-flag: ${flags.join(", ")}`};
+    if (PREGNANCY_HIGH_RISK_COMPLAINTS.includes(p.chief_complaint)) return {flag:true, reason:`Pregnancy + high-risk complaint ('${p.chief_complaint}')`};
+  }
+  if (p.symptom_onset_hours<=RAPID_ONSET_THRESHOLD && HIGH_RESOURCE_COMPLAINTS.includes(p.chief_complaint))
+    return {flag:true, reason:`Rapid onset (${p.symptom_onset_hours}hr) of '${p.chief_complaint}'`};
+  return {flag:false};
+}
+function step3(p, kw) {
+  let base;
+  if (HIGH_RESOURCE_COMPLAINTS.includes(p.chief_complaint)) base=2;
+  else if (LOW_RESOURCE_COMPLAINTS.includes(p.chief_complaint)) base=0;
+  else base=1;
+  const chronic = p.chronic_illness_conditions||[];
+  if (chronic.length) base+=1;
+  if (chronic.some(c=>HIGH_RISK_CHRONIC.includes(c))) base+=1;
+  if (kw.length) base+=1;
+  if (getAgeBand(p.age)==="pediatric" && p.weight_kg<8.0) base+=1;
+  return Math.min(base,2);
+}
+function step4(p, ageBand) {
+  const z = DANGER_ZONES[ageBand]; const reasons=[];
+  if (p.heart_rate>z.hr) reasons.push(`HR ${p.heart_rate} above ${ageBand} threshold (${z.hr})`);
+  if (p.respiratory_rate>z.rr) reasons.push(`RR ${p.respiratory_rate} above ${ageBand} threshold (${z.rr})`);
+  if (p.spo2<z.spo2) reasons.push(`SpO2 ${p.spo2}% below ${ageBand} threshold (${z.spo2}%)`);
+  return {flag: reasons.length>0, reasons};
+}
+function calcConfidence(p, kw, hedges, vitalPresent) {
+  let c=100; const reasons=[];
+  if (!p.has_prior_record) { c-=15; reasons.push("No prior health record (zero-history patient)"); }
+  if (hedges>0) { c-=10*hedges; reasons.push(`${hedges} ambiguous/hedging phrase(s) in symptom text`); }
+  if (!vitalPresent && kw.length) { c-=25; reasons.push("Vitals appear mild but red-flag keyword(s) found - contradictory signal"); }
+  if (p.pain_score>=8 && !vitalPresent && !kw.length) { c-=15; reasons.push("High self-reported urgency, no objective correlate - recommend manual review"); }
+  if (!vitalPresent && !kw.length) { c-=10; reasons.push("Thin evidence overall"); }
+  return { confidence: Math.max(c,20), reasons };
+}
+function triagePatient(p) {
+  const ageBand = getAgeBand(p.age);
+  const { matched: kw, hedges } = scanSymptomText(p.symptom_description);
+  let rawEsi, trace=[];
+  const s1 = step1(p);
+  if (s1.flag) { rawEsi=1; trace.push(`Step 1: LIFE-THREAT — ${s1.reason}`); }
+  else {
+    trace.push("Step 1: No immediate life-threat");
+    const s2 = step2(p, kw);
+    if (s2.flag) { rawEsi=2; trace.push(`Step 2: HIGH-RISK — ${s2.reason}`); }
+    else {
+      trace.push("Step 2: Not high-risk");
+      const rc = step3(p, kw);
+      trace.push(`Step 3: Predicted resources = ${rc}`);
+      if (rc===0) rawEsi=5;
+      else if (rc===1) rawEsi=4;
+      else {
+        const s4 = step4(p, ageBand);
+        if (s4.flag) { rawEsi=2; trace.push(`Step 4: DANGER ZONE — escalated (${s4.reasons.join("; ")})`); }
+        else { rawEsi=3; trace.push("Step 4: Vitals stable, within age-adjusted safe range"); }
+      }
+    }
+  }
+  const vitalPresent = s1.flag || ["verbal","pain"].includes(p.consciousness_level) || p.pain_score>=8;
+  const { confidence, reasons: confReasons } = calcConfidence(p, kw, hedges, vitalPresent);
+  let finalEsi=rawEsi, escalated=false, escalationReason=null;
+  if (confidence<60 && finalEsi>1) { finalEsi-=1; escalated=true; escalationReason=`Escalated due to low confidence (${confidence}%)`; }
+  return { patient_id:p.patient_id, age:p.age, age_band:ageBand, raw_esi_level:rawEsi, final_esi_level:finalEsi,
+    confidence_pct:confidence, escalated, escalation_reason:escalationReason, decision_trace:trace,
+    keyword_matches:kw, confidence_reasons:confReasons };
+}
+
+/* =========================================================
+   BED MANAGER (90/10 rule)
+   ========================================================= */
+function makeBedManager(totalBeds, reservedPct=0.10) {
+  const reserved = Math.max(1, Math.round(totalBeds*reservedPct));
+  return { totalBeds, reservedBeds: reserved, dynamicBeds: totalBeds-reserved, dynamicOccupied:0, reservedOccupied:0 };
+}
+function assignBed(bm, esiLevel) {
+  const isCritical = esiLevel<=2;
+  if (bm.dynamicOccupied < bm.dynamicBeds) { bm.dynamicOccupied++; return {pool:"dynamic", waitlisted:false}; }
+  if (isCritical && bm.reservedOccupied < bm.reservedBeds) { bm.reservedOccupied++; return {pool:"reserved_critical", waitlisted:false}; }
+  return {pool:null, waitlisted:true};
+}
+function estimateWait(position, doctors) { doctors = Math.max(1, doctors); return +((position*15)/doctors).toFixed(1); }
+
+/* =========================================================
+   PATIENT GENERATOR (for optional demo tools)
+   ========================================================= */
+let pidCounter = 1000;
+function nextId() { pidCounter += 1; return "P" + pidCounter; }
+
+function generateVitals(severity) {
+  let hr,rr,spo2,temp,bpSys,pain,consciousness;
+  if (severity === "critical") {
+    hr = randInt(120,190); rr = randInt(28,40); spo2 = randInt(78,90);
+    temp = rand(38.5,40.5).toFixed(1)*1; bpSys = randInt(70,90); pain = randInt(7,10);
+    consciousness = choice(["verbal","pain","unresponsive"]);
+  } else if (severity === "moderate") {
+    hr = randInt(100,120); rr = randInt(20,28); spo2 = randInt(91,95);
+    temp = rand(37.8,39.0).toFixed(1)*1; bpSys = randInt(95,115); pain = randInt(4,7);
+    consciousness = "alert";
+  } else {
+    hr = randInt(60,98); rr = randInt(12,19); spo2 = randInt(96,100);
+    temp = rand(36.5,37.4).toFixed(1)*1; bpSys = randInt(110,130); pain = randInt(0,3);
+    consciousness = "alert";
+  }
+  const bpDia = bpSys - randInt(30,50);
+  return { heart_rate: hr, blood_pressure: `${bpSys}/${bpDia}`, temperature: temp,
+    respiratory_rate: rr, spo2, pain_score: pain, consciousness_level: consciousness };
+}
+function generateWeight(age) {
+  if (age < 1) return +rand(3,10).toFixed(1);
+  if (age < 12) return +rand(10,45).toFixed(1);
+  if (age < 65) return +rand(45,100).toFixed(1);
+  return +rand(45,90).toFixed(1);
+}
+function generateOnset(severity) {
+  if (severity === "critical") return +rand(0.2,3.0).toFixed(1);
+  if (severity === "moderate") return +rand(1.0,12.0).toFixed(1);
+  return +rand(4.0,72.0).toFixed(1);
+}
+function generatePregnancy(age, gender) {
+  if (gender !== "F" || age < 14 || age > 50) return "not_applicable";
+  return Math.random() < 0.08 ? "pregnant" : "not_pregnant";
+}
+function makeSyntheticPatient(opts) {
+  const age = opts.age ?? randInt(18,65);
+  const gender = opts.gender ?? choice(["M","F"]);
+  const hasPrior = opts.has_prior_record ?? (Math.random() > 0.5);
+  const arrivalMode = opts.arrival_mode ?? weightedChoice(ARRIVAL_MODES,[0.6,0.3,0.1]);
+  const chiefComplaint = opts.chief_complaint ?? choice(CHIEF_COMPLAINTS);
+  const weight = opts.weight_kg ?? generateWeight(age);
+  const severity = opts.severity_hint ?? "normal";
+  const onset = opts.symptom_onset_hours ?? generateOnset(severity);
+  const pregnancy = opts.pregnancy_status ?? generatePregnancy(age, gender);
+  const vitals = generateVitals(severity);
+  const chronic = opts.chronic_illness_conditions ?? (hasPrior ? sample(CHRONIC_ILLNESS_POOL, weightedChoice([0,1,2],[0.5,0.35,0.15])) : []);
+  const symptomText = opts.symptom_text ?? `Patient reports ${chiefComplaint}, onset within last few hours.`;
+  return {
+    patient_id: nextId(), age, gender, arrival_mode: arrivalMode, weight_kg: weight,
+    ...vitals, chief_complaint: chiefComplaint, symptom_description: symptomText, symptom_onset_hours: onset,
+    has_prior_record: hasPrior, chronic_illness_conditions: chronic,
+    prior_visits_count: hasPrior ? randInt(1,5) : 0, pregnancy_status: pregnancy, consent_given: true,
+  };
+}
+function generateDemoDataset(numPatients) {
+  const patients = [];
+  patients.push(makeSyntheticPatient({ age:45, severity_hint:"normal", chief_complaint:"chest pain",
+    symptom_text:"Patient says pain is mild, 3/10, but mentions it radiates to left arm and jaw, and feels 'a bit off'." }));
+  patients.push(makeSyntheticPatient({ age:3, severity_hint:"moderate", chief_complaint:"fever",
+    symptom_text:"Child crying, high fever since morning, refusing to eat, mother reports lethargy.", has_prior_record:false }));
+  patients.push(makeSyntheticPatient({ age:78, severity_hint:"moderate", chief_complaint:"dizziness",
+    symptom_text:"Elderly patient reports dizziness and mild confusion since this morning, lives alone.", has_prior_record:true }));
+  patients.push(makeSyntheticPatient({ age:29, severity_hint:"normal", chief_complaint:"abdominal pain",
+    symptom_text:"First-time patient, new to city, reports moderate abdominal pain since last night.", has_prior_record:false }));
+  patients.push(makeSyntheticPatient({ age:27, gender:"F", severity_hint:"normal", chief_complaint:"abdominal pain",
+    symptom_text:"Patient reports abdominal pain with some vaginal bleeding, 28 weeks pregnant.",
+    pregnancy_status:"pregnant", symptom_onset_hours:1.5 }));
+  const remaining = Math.max(0, numPatients - patients.length);
+  const mix = [];
+  for (let i=0;i<Math.max(1,Math.floor(remaining/10));i++) mix.push("critical");
+  for (let i=0;i<Math.max(1,Math.floor(remaining/3));i++) mix.push("moderate");
+  while (mix.length < remaining) mix.push("normal");
+  mix.length = remaining;
+  mix.sort(() => Math.random()-0.5);
+  mix.forEach(sev => {
+    const age = weightedChoice([randInt(1,11), randInt(12,64), randInt(65,95)], [0.15,0.65,0.20]);
+    patients.push(makeSyntheticPatient({ age, severity_hint: sev }));
+  });
+  return patients;
+}
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let state = { results: [], bedManager: makeBedManager(22, 0.10), overrides: [], pendingResult: null };
+
+/* =========================================================
+   FORM SETUP
+   ========================================================= */
+function populateForm() {
+  document.getElementById('m_complaint').innerHTML = CHIEF_COMPLAINTS.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('m_chronic_checks').innerHTML = CHRONIC_ILLNESS_POOL.map(c =>
+    `<label><input type="checkbox" class="chronic-cb" value="${c}"> ${c}</label>`).join('');
+  document.getElementById('overrideEsi').innerHTML = [1,2,3,4,5].map(n => `<option value="${n}">ESI ${n}</option>`).join('');
+}
+
+function collectFormPatient() {
+  const chronicChecked = Array.from(document.querySelectorAll('.chronic-cb:checked')).map(cb=>cb.value);
+  const symptomText = document.getElementById('m_symptom').value.trim();
+  const complaint = document.getElementById('m_complaint').value;
+  return {
+    patient_id: nextId(),
+    age: +document.getElementById('m_age').value,
+    gender: document.getElementById('m_gender').value,
+    arrival_mode: document.getElementById('m_arrival').value,
+    weight_kg: +document.getElementById('m_weight').value,
+    heart_rate: +document.getElementById('m_hr').value,
+    respiratory_rate: +document.getElementById('m_rr').value,
+    spo2: +document.getElementById('m_spo2').value,
+    temperature: +document.getElementById('m_temp').value,
+    pain_score: +document.getElementById('m_pain').value,
+    consciousness_level: document.getElementById('m_consciousness').value,
+    chief_complaint: complaint,
+    symptom_description: symptomText || `Patient reports ${complaint}.`,
+    symptom_onset_hours: +document.getElementById('m_onset').value,
+    has_prior_record: document.getElementById('m_prior').checked,
+    chronic_illness_conditions: chronicChecked,
+    prior_visits_count: document.getElementById('m_prior').checked ? randInt(1,5) : 0,
+    pregnancy_status: document.getElementById('m_pregnancy').value,
+    consent_given: true,
+  };
+}
+
+/* =========================================================
+   RECOMMENDATION FLOW
+   ========================================================= */
+function runTriageOnForm() {
+  const patient = collectFormPatient();
+  const result = triagePatient(patient);
+  state.pendingResult = { ...result, patient };
+
+  const color = `var(${ESI_COLOR[result.final_esi_level]})`;
+  document.getElementById('recoBadge').style.background = color;
+  document.getElementById('recoBadge').textContent = result.final_esi_level;
+  document.getElementById('recoHeadline').textContent =
+    `ESI ${result.final_esi_level} — confidence ${result.confidence_pct}%` + (result.escalated ? " (escalated)" : "");
+  document.getElementById('recoSub').textContent =
+    `${patient.chief_complaint} · age ${patient.age} (${result.age_band}) · ${patient.arrival_mode}` +
+    (result.escalation_reason ? ` — ${result.escalation_reason}` : "");
+
+  document.getElementById('recoTrace').innerHTML = result.decision_trace.map(t => {
+    const isHit = /LIFE-THREAT|HIGH-RISK|DANGER ZONE/.test(t);
+    return `<div class="trace-line ${isHit?'hit':''}">${t}</div>`;
+  }).join('');
+
+  document.getElementById('recoConfReasons').innerHTML = result.confidence_reasons.length
+    ? result.confidence_reasons.map(r=>`<li>${r}</li>`).join('') : '';
+
+  document.getElementById('overrideEsi').value = result.final_esi_level;
+  document.getElementById('overridePanel').classList.remove('show');
+  document.getElementById('overrideReason').value = '';
+  document.getElementById('admittedTag').style.display = 'none';
+  document.getElementById('btnAccept').disabled = false;
+  document.getElementById('btnShowOverride').disabled = false;
+
+  document.getElementById('recoPanel').classList.add('show');
+  document.getElementById('recoPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function admitPatient(finalEsi, overrideInfo) {
+  const pr = state.pendingResult;
+  const bedOutcome = assignBed(state.bedManager, finalEsi);
+  const entry = {
+    ...pr, final_esi_level: finalEsi, patient: pr.patient, bedOutcome,
+    overridden: overrideInfo || null,
+  };
+  state.results.push(entry);
+
+  if (overrideInfo) {
+    state.overrides.push({
+      patient_id: pr.patient_id, ai_esi: pr.final_esi_level, ai_confidence: pr.confidence_pct,
+      new_esi: finalEsi, overridden_by: overrideInfo.by, reason: overrideInfo.reason,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  document.getElementById('admittedTag').style.display = 'inline-flex';
+  document.getElementById('btnAccept').disabled = true;
+  document.getElementById('btnShowOverride').disabled = true;
+
+  renderSidebar();
+  renderQueueList();
+
+  // Reset form for the next patient after a short pause
+  setTimeout(() => {
+    document.getElementById('recoPanel').classList.remove('show');
+    document.getElementById('m_symptom').value = '';
+    document.getElementById('m_prior').checked = false;
+    document.querySelectorAll('.chronic-cb').forEach(cb=>cb.checked=false);
+  }, 1400);
+}
+
+document.getElementById('btnRunTriage').addEventListener('click', runTriageOnForm);
+document.getElementById('btnAccept').addEventListener('click', () => admitPatient(state.pendingResult.final_esi_level, null));
+document.getElementById('btnShowOverride').addEventListener('click', () => {
+  document.getElementById('overridePanel').classList.toggle('show');
+});
+document.getElementById('btnConfirmOverride').addEventListener('click', () => {
+  const reason = document.getElementById('overrideReason').value.trim();
+  const reasonInput = document.getElementById('overrideReason');
+  if (!reason) { reasonInput.style.borderColor = 'var(--esi1)'; reasonInput.placeholder = 'Reason required'; return; }
+  const newEsi = +document.getElementById('overrideEsi').value;
+  const by = document.getElementById('overrideBy').value.trim() || 'Nurse';
+  admitPatient(newEsi, { by, reason, aiEsi: state.pendingResult.final_esi_level });
+});
+
+/* =========================================================
+   RENDERING: sidebar + queue
+   ========================================================= */
+function renderSidebar() {
+  const bm = state.bedManager;
+  const occupied = bm.dynamicOccupied + bm.reservedOccupied;
+  const criticalWaitlisted = state.results.filter(r=>r.bedOutcome.waitlisted && r.final_esi_level<=2).length;
+  const avgConf = state.results.length ? Math.round(state.results.reduce((a,r)=>a+r.confidence_pct,0)/state.results.length) : null;
+
+  document.getElementById('statTotal').textContent = state.results.length;
+  document.getElementById('statCritWait').textContent = criticalWaitlisted;
+  document.getElementById('statConf').textContent = avgConf !== null ? avgConf + '%' : '—';
+
+  document.getElementById('dynLabel').textContent = `${bm.dynamicOccupied}/${bm.dynamicBeds}`;
+  document.getElementById('dynFill').style.width = (bm.dynamicOccupied/bm.dynamicBeds*100) + '%';
+  document.getElementById('resLabel').textContent = `${bm.reservedOccupied}/${bm.reservedBeds}`;
+  document.getElementById('resFill').style.width = (bm.reservedOccupied/bm.reservedBeds*100) + '%';
+
+  const doctors = +document.getElementById('inputDoctors').value || 4;
+  const waitlisted = state.results.filter(r=>r.bedOutcome.waitlisted);
+  const flagged = waitlisted.map((r,i)=>{
+    const wait = estimateWait(i+1, doctors);
+    const threshold = SAFE_WAIT_THRESHOLD[r.final_esi_level];
+    return {...r, wait, threshold, over: wait>threshold};
+  }).filter(e=>e.over);
+  document.getElementById('queuePanel').innerHTML = flagged.length ? flagged.map(e=>`
+    <div class="queue-alert"><span>${e.patient_id} · ESI ${e.final_esi_level} · wait ${e.wait}min (safe ≤${e.threshold}min)</span><span class="badge">REASSESS</span></div>
+  `).join('') : `<div class="empty-note">No patients currently exceeding safe wait thresholds.</div>`;
+
+  document.getElementById('auditPanel').innerHTML = state.overrides.length ? state.overrides.slice().reverse().map(o=>`
+    <div class="audit-entry">
+      <div class="top-row"><span>${o.patient_id}</span><span>${new Date(o.timestamp).toLocaleTimeString()}</span></div>
+      <div>ESI ${o.ai_esi} → <span class="${o.new_esi<o.ai_esi?'dir-up':'dir-down'}">${o.new_esi}</span> by ${o.overridden_by}</div>
+      <div class="reason">${o.reason}</div>
+    </div>
+  `).join('') : `<div class="empty-note">No overrides logged yet.</div>`;
+}
+
+function renderQueueList() {
+  document.getElementById('queueCount').textContent = state.results.length ? `(${state.results.length})` : '';
+  if (!state.results.length) {
+    document.getElementById('patientList').innerHTML = `<div class="queue-empty">No patients admitted yet — use the intake form above.</div>`;
+    return;
+  }
+  const sorted = [...state.results].sort((a,b)=>a.final_esi_level-b.final_esi_level);
+  document.getElementById('patientList').innerHTML = sorted.map(r => {
+    const color = `var(${ESI_COLOR[r.final_esi_level]})`;
+    const bedBadge = r.bedOutcome.waitlisted ? `<span class="bed-pill wait">Waitlisted</span>` :
+      r.bedOutcome.pool === "reserved_critical" ? `<span class="bed-pill reserved">Reserved bed</span>` :
+      `<span class="bed-pill dynamic">Dynamic bed</span>`;
+    const traceHtml = r.decision_trace.map(t => {
+      const isHit = /LIFE-THREAT|HIGH-RISK|DANGER ZONE/.test(t);
+      return `<div class="trace-line ${isHit?'hit':''}">${t}</div>`;
+    }).join('');
+    const overrideTag = r.overridden ? `<div class="override-tag-sm">⚠ Overridden by ${r.overridden.by} — ESI ${r.overridden.aiEsi} → ${r.final_esi_level}</div>` : '';
+
+    return `
+      <div class="p-card" style="border-left-color:${color}" data-id="${r.patient_id}">
+        <div class="p-row" onclick="document.querySelector('.p-card[data-id=\\'${r.patient_id}\\']').classList.toggle('open')">
+          <div class="esi-badge-sm" style="background:${color}">${r.final_esi_level}</div>
+          <div class="p-id">${r.patient_id}</div>
+          <div class="p-meta">
+            <div class="p-complaint">${r.patient.chief_complaint} · age ${r.age} (${r.age_band})</div>
+            <div class="p-sub">${r.patient.arrival_mode} · onset ${r.patient.symptom_onset_hours}hr</div>
+          </div>
+          <span class="conf-pill">conf ${r.confidence_pct}%</span>
+          ${bedBadge}
+          <span class="chevron">▶</span>
+        </div>
+        <div class="p-detail">
+          <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:6px;font-style:italic;">"${r.patient.symptom_description}"</div>
+          ${traceHtml}
+          ${overrideTag}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* =========================================================
+   DEMO TOOLS
+   ========================================================= */
+function loadDemo(numPatients, reservedPct=0.10) {
+  const totalBeds = +document.getElementById('inputBeds').value || 22;
+  const patients = generateDemoDataset(numPatients);
+  state.bedManager = makeBedManager(totalBeds, reservedPct);
+  state.results = patients.map(p => {
+    const r = triagePatient(p);
+    const bedOutcome = assignBed(state.bedManager, r.final_esi_level);
+    return { ...r, patient: p, bedOutcome, overridden: null };
+  });
+  renderSidebar(); renderQueueList();
+}
+
+document.getElementById('btnLoadDemo').addEventListener('click', () => loadDemo(20));
+document.getElementById('btnSurge').addEventListener('click', () => {
+  const totalBeds = +document.getElementById('inputBeds').value || 22;
+  loadDemo(60);
+  const bmBaseline = makeBedManager(totalBeds, 0.0);
+  let baselineCrit = 0;
+  state.results.forEach(r => { const o = assignBed(bmBaseline, r.final_esi_level); if (o.waitlisted && r.final_esi_level<=2) baselineCrit++; });
+  const withBufferCrit = state.results.filter(r=>r.bedOutcome.waitlisted && r.final_esi_level<=2).length;
+  const rescued = state.results.filter(r=>r.bedOutcome.pool==="reserved_critical");
+  alert(`3× surge: 60 patients vs ${totalBeds} beds.\nWithout 90/10 buffer: ${baselineCrit} critical patients waitlisted.\nWith buffer: ${withBufferCrit} waitlisted.\nRescued by reserved pool: ${rescued.map(r=>r.patient_id).join(', ') || 'none'}`);
+});
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.results = []; state.overrides = []; state.bedManager = makeBedManager(+document.getElementById('inputBeds').value || 22, 0.10);
+  renderSidebar(); renderQueueList();
+});
+document.getElementById('inputDoctors').addEventListener('input', renderSidebar);
+
+/* init */
+populateForm();
+renderSidebar();
+</script>
+</body>
+</html>
